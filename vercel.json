@@ -1,5 +1,4 @@
 {
-    "comment": "Vercel config để deploy thư mục mixtape-master dưới dạng static site",
     "outputDirectory": "mixtape-master",
     "buildCommand": "",
     "installCommand": "",
