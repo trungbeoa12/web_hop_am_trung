@@ -3,8 +3,9 @@
 // Ưu tiên đọc cấu hình runtime từ Vercel env qua /api/config.
 const RUNTIME_CONFIG_ENDPOINT = "/api/config";
 const _cfg = window.CHORD_CONFIG || {};
-let API_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "") + "/api/v1/songs";
-let API_SECRET = _cfg.secretKey || "";
+let API_BASE_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "");
+const ADMIN_TOKEN_STORAGE_KEY = "trung-beo-admin-token";
+let ADMIN_TOKEN = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
 const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_INDEX = {
 	"C": 0, "B#": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
@@ -77,13 +78,21 @@ const state = {
 	songs: [],
 	activeSong: null,
 	transpose: 0,
-	apiOnline: false
+	apiOnline: false,
+	pendingAction: null,
+	editingSongId: null
 };
 
 const elements = {
 	songList: document.querySelector("#songList"),
 	songCount: document.querySelector("#songCount"),
 	apiStatus: document.querySelector("#apiStatus"),
+	authStatus: document.querySelector("#authStatus"),
+	authButton: document.querySelector("#authButton"),
+	openSongForm: document.querySelector("#openSongForm"),
+	editSongButton: document.querySelector("#editSongButton"),
+	deleteSongButton: document.querySelector("#deleteSongButton"),
+	adminActions: document.querySelector("#adminActions"),
 	search: document.querySelector("#songSearch"),
 	title: document.querySelector("#songTitle"),
 	artist: document.querySelector("#songArtist"),
@@ -92,8 +101,12 @@ const elements = {
 	transposeValue: document.querySelector("#transposeValue"),
 	sheet: document.querySelector("#chordSheet"),
 	modal: document.querySelector("#songModal"),
+	modalEyebrow: document.querySelector("#songModalEyebrow"),
 	form: document.querySelector("#songForm"),
 	formMessage: document.querySelector("#formMessage"),
+	loginModal: document.querySelector("#loginModal"),
+	loginForm: document.querySelector("#loginForm"),
+	loginMessage: document.querySelector("#loginMessage"),
 	sidebar: document.querySelector("#sidebar"),
 	sidebarBackdrop: document.querySelector("#sidebarBackdrop")
 };
@@ -103,6 +116,8 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
 	await loadRuntimeConfig();
 	bindEvents();
+	await validateAdminSession();
+	updateAuthUi();
 	await loadSongs();
 }
 
@@ -115,10 +130,7 @@ async function loadRuntimeConfig() {
 		if (!response.ok) return;
 		const runtime = await response.json();
 		if (runtime.apiBaseUrl) {
-			API_URL = String(runtime.apiBaseUrl).replace(/\/$/, "") + "/api/v1/songs";
-		}
-		if (runtime.secretKey) {
-			API_SECRET = String(runtime.secretKey);
+			API_BASE_URL = String(runtime.apiBaseUrl).replace(/\/$/, "");
 		}
 	} catch (error) {
 		// Giữ nguyên fallback từ window.CHORD_CONFIG khi endpoint không tồn tại.
@@ -130,23 +142,183 @@ function bindEvents() {
 	document.querySelector("#transposeDown").addEventListener("click", () => changeTranspose(-1));
 	document.querySelector("#transposeUp").addEventListener("click", () => changeTranspose(1));
 	document.querySelector("#resetTranspose").addEventListener("click", () => setTranspose(0));
-	document.querySelector("#openSongForm").addEventListener("click", openModal);
+	elements.openSongForm.addEventListener("click", openSongEntryForm);
+	elements.editSongButton.addEventListener("click", openEditSongForm);
+	elements.deleteSongButton.addEventListener("click", deleteActiveSong);
+	elements.authButton.addEventListener("click", handleAuthButtonClick);
 	document.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", closeModal));
+	document.querySelectorAll("[data-close-login-modal]").forEach((button) => button.addEventListener("click", closeLoginModal));
 	document.querySelector("#sidebarToggle").addEventListener("click", openSidebar);
 	document.querySelector("#closeSidebar").addEventListener("click", closeSidebar);
 	elements.sidebarBackdrop.addEventListener("click", closeSidebar);
 	elements.form.addEventListener("submit", saveSong);
+	elements.loginForm.addEventListener("submit", handleAdminLogin);
 	document.addEventListener("keydown", (event) => {
 		if (event.key === "Escape") {
 			closeModal();
+			closeLoginModal();
 			closeSidebar();
 		}
 	});
 }
 
+function apiUrl(path) {
+	return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+}
+
+function hasAdminToken() {
+	return Boolean(ADMIN_TOKEN);
+}
+
+function getAuthHeaders() {
+	return hasAdminToken() ? { Authorization: `Bearer ${ADMIN_TOKEN}` } : {};
+}
+
+function setAdminToken(token) {
+	ADMIN_TOKEN = token;
+	localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+	updateAuthUi();
+}
+
+function clearAdminToken() {
+	ADMIN_TOKEN = "";
+	localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+	updateAuthUi();
+}
+
+function updateAuthUi() {
+	const isAdmin = hasAdminToken();
+	if (elements.authStatus) {
+		elements.authStatus.textContent = isAdmin ? "Admin" : "Khách";
+		elements.authStatus.classList.toggle("admin", isAdmin);
+		elements.authStatus.classList.toggle("guest", !isAdmin);
+	}
+	if (elements.authButton) {
+		elements.authButton.textContent = isAdmin ? "Đăng xuất" : "Đăng nhập admin";
+		elements.authButton.title = isAdmin ? "Đăng xuất admin" : "Đăng nhập admin";
+	}
+
+	[elements.openSongForm, elements.adminActions].forEach((el) => {
+		if (!el) return;
+		el.classList.toggle("hidden", !isAdmin);
+	});
+
+	if (state.songs.length) {
+		renderSongList(elements.search.value);
+	}
+}
+
+async function validateAdminSession() {
+	if (!hasAdminToken()) return;
+
+	try {
+		const response = await fetch(apiUrl("/api/v1/admin/me"), {
+			headers: {
+				...getAuthHeaders()
+			}
+		});
+		if (response.status === 401) {
+			clearAdminToken();
+			return;
+		}
+		if (!response.ok) throw new Error(`API trả về ${response.status}`);
+	} catch (error) {
+		clearAdminToken();
+	}
+}
+
+function handleAuthButtonClick() {
+	if (hasAdminToken()) {
+		logoutAdmin();
+		return;
+	}
+
+	openLoginModal();
+}
+
+function logoutAdmin() {
+	clearAdminToken();
+	state.pendingAction = null;
+	setApiStatus("Đã đăng xuất", false);
+	closeLoginModal();
+}
+
+function openLoginModal(message = "") {
+	elements.loginMessage.textContent = message;
+	elements.loginModal.classList.add("open");
+	elements.loginModal.setAttribute("aria-hidden", "false");
+	setTimeout(() => elements.loginForm.elements.password.focus(), 0);
+}
+
+function closeLoginModal() {
+	elements.loginModal.classList.remove("open");
+	elements.loginModal.setAttribute("aria-hidden", "true");
+	if (elements.loginMessage) {
+		elements.loginMessage.textContent = "";
+	}
+}
+
+function openSongEntryForm() {
+	if (!hasAdminToken()) {
+		state.pendingAction = { type: "openSongForm" };
+		openLoginModal("Đăng nhập admin để thêm bài hát.");
+		return;
+	}
+
+	openModal();
+}
+
+async function handleAdminLogin(event) {
+	event.preventDefault();
+	const password = String(new FormData(elements.loginForm).get("password") || "").trim();
+	if (!password) {
+		elements.loginMessage.textContent = "Vui lòng nhập mật khẩu admin.";
+		return;
+	}
+
+	elements.loginMessage.textContent = "Đang đăng nhập...";
+	try {
+		const response = await fetch(apiUrl("/api/v1/admin/login"), {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ password })
+		});
+		if (!response.ok) {
+			if (response.status === 401) {
+				elements.loginMessage.textContent = "Sai mật khẩu admin.";
+				return;
+			}
+			throw new Error(`API trả về ${response.status}`);
+		}
+		const payload = await response.json();
+		setAdminToken(String(payload.token || ""));
+		closeLoginModal();
+		elements.loginForm.reset();
+		const pendingAction = state.pendingAction;
+		state.pendingAction = null;
+		if (pendingAction?.type === "openSongForm") {
+			openModal();
+		}
+		if (pendingAction?.type === "openEditSongForm") {
+			openEditSongForm();
+		}
+		if (pendingAction?.type === "saveSong") {
+			await performSaveSong(pendingAction.song, true);
+		}
+			if (pendingAction?.type === "updateSong") {
+				await performUpdateSong(pendingAction.songId, pendingAction.song, true);
+			}
+		if (pendingAction?.type === "deleteSong") {
+			await performDeleteSong(pendingAction.song, true);
+		}
+	} catch (error) {
+		elements.loginMessage.textContent = `Không thể đăng nhập: ${error.message}`;
+	}
+}
+
 async function loadSongs() {
 	try {
-		const response = await fetch(API_URL, { headers: { "Accept": "application/json" } });
+		const response = await fetch(apiUrl("/api/v1/songs"), { headers: { "Accept": "application/json" } });
 		if (!response.ok) throw new Error(`API trả về ${response.status}`);
 		const payload = await response.json();
 		state.songs = normalizeSongList(payload);
@@ -210,15 +382,19 @@ function renderSongList(query = "") {
 		);
 		selectButton.append(number, copy, createElement("span", "song-list-key", song.key));
 
-		const deleteButton = document.createElement("button");
-		deleteButton.type = "button";
-		deleteButton.className = "song-delete";
-		deleteButton.title = `Xóa ${song.title}`;
-		deleteButton.setAttribute("aria-label", `Xóa ${song.title}`);
-		deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
-		deleteButton.addEventListener("click", () => deleteSong(song));
+		item.append(selectButton);
 
-		item.append(selectButton, deleteButton);
+		if (hasAdminToken()) {
+			const deleteButton = document.createElement("button");
+			deleteButton.type = "button";
+			deleteButton.className = "song-delete";
+			deleteButton.title = `Xóa ${song.title}`;
+			deleteButton.setAttribute("aria-label", `Xóa ${song.title}`);
+			deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
+			deleteButton.addEventListener("click", () => deleteSong(song));
+			item.append(deleteButton);
+		}
+
 		return item;
 	}));
 }
@@ -248,14 +424,37 @@ async function deleteSong(song) {
 	const confirmed = window.confirm(`Xóa "${song.title}" khỏi thư viện? Thao tác này không thể hoàn tác.`);
 	if (!confirmed) return;
 
+	if (!hasAdminToken()) {
+		state.pendingAction = { type: "deleteSong", song };
+		openLoginModal("Đăng nhập admin để xóa bài hát.");
+		return;
+	}
+
+	await performDeleteSong(song);
+}
+
+async function performDeleteSong(song, fromPendingAction = false) {
+
 	if (state.apiOnline) {
 		try {
-			const response = await fetch(`${API_URL}/${encodeURIComponent(song.id)}`, {
+			const response = await fetch(`${apiUrl("/api/v1/songs")}/${encodeURIComponent(song.id)}`, {
 				method: "DELETE",
-				headers: API_SECRET ? { "X-Secret-Key": API_SECRET } : {}
+				headers: {
+					...getAuthHeaders()
+				}
 			});
+			if (response.status === 401) {
+				clearAdminToken();
+				state.pendingAction = { type: "deleteSong", song };
+				openLoginModal("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+				return;
+			}
 			if (!response.ok) throw new Error(`API trả về ${response.status}`);
 		} catch (error) {
+			if (fromPendingAction) {
+				window.alert(`Không thể xóa bài hát: ${error.message}`);
+				return;
+			}
 			window.alert(`Không thể xóa bài hát: ${error.message}`);
 			return;
 		}
@@ -409,24 +608,89 @@ async function saveSong(event) {
 	event.preventDefault();
 	const formData = new FormData(elements.form);
 	const song = normalizeSong(Object.fromEntries(formData.entries()));
-	song.id = `local-${Date.now()}`;
-	elements.formMessage.textContent = "Đang lưu...";
+	if (!state.editingSongId) {
+		song.id = `local-${Date.now()}`;
+	}
+	if (!hasAdminToken()) {
+		state.pendingAction = state.editingSongId
+			? { type: "updateSong", songId: state.editingSongId, song }
+			: { type: "saveSong", song };
+		openLoginModal("Đăng nhập admin để lưu bài hát.");
+		return;
+	}
+
+	if (state.editingSongId) {
+		await performUpdateSong(state.editingSongId, song);
+		return;
+	}
+
+	await performSaveSong(song);
+}
+
+async function performUpdateSong(songId, song, fromPendingAction = false) {
+	elements.formMessage.textContent = "Đang cập nhật...";
 
 	try {
-		const response = await fetch(API_URL, {
-			method: "POST",
+		const response = await fetch(`${apiUrl("/api/v1/songs")}/${encodeURIComponent(songId)}`, {
+			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
-				...(API_SECRET ? { "X-Secret-Key": API_SECRET } : {})
+				...getAuthHeaders()
 			},
 			body: JSON.stringify(song)
 		});
+		if (response.status === 401) {
+			clearAdminToken();
+			state.pendingAction = { type: "updateSong", songId, song };
+			openLoginModal("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+			return;
+		}
+		if (!response.ok) throw new Error(`API trả về ${response.status}`);
+		const updatedSong = normalizeSong(await response.json());
+		state.songs = state.songs.map((item) => String(item.id) === String(songId) ? updatedSong : item);
+		state.apiOnline = true;
+		setApiStatus("Đã kết nối", false);
+		elements.form.reset();
+		closeModal();
+		renderSongList(elements.search.value);
+		selectSong(updatedSong.id);
+	} catch (error) {
+		if (fromPendingAction) {
+			elements.formMessage.textContent = `Không thể cập nhật bài hát: ${error.message}`;
+			return;
+		}
+		elements.formMessage.textContent = `Không thể cập nhật bài hát: ${error.message}`;
+	}
+}
+
+async function performSaveSong(song, fromPendingAction = false) {
+	elements.formMessage.textContent = "Đang lưu...";
+
+	try {
+		const response = await fetch(apiUrl("/api/v1/songs"), {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				...getAuthHeaders()
+			},
+			body: JSON.stringify(song)
+		});
+		if (response.status === 401) {
+			clearAdminToken();
+			state.pendingAction = { type: "saveSong", song };
+			openLoginModal("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+			return;
+		}
 		if (!response.ok) throw new Error(`API trả về ${response.status}`);
 		const savedSong = normalizeSong(await response.json());
 		state.songs.unshift(savedSong);
 		state.apiOnline = true;
 		setApiStatus("Đã kết nối", false);
 	} catch (error) {
+		if (fromPendingAction) {
+			elements.formMessage.textContent = `Không thể lưu bài hát: ${error.message}`;
+			return;
+		}
 		const localSongs = JSON.parse(localStorage.getItem("trung-beo-chords") || "[]");
 		localSongs.unshift(song);
 		localStorage.setItem("trung-beo-chords", JSON.stringify(localSongs));
@@ -447,9 +711,43 @@ function openModal() {
 	setTimeout(() => elements.form.elements.title.focus(), 0);
 }
 
+function openEditSongForm() {
+	const song = state.activeSong;
+	if (!song) {
+		window.alert("Hãy chọn một bài hát để sửa.");
+		return;
+	}
+	if (!hasAdminToken()) {
+		state.pendingAction = { type: "openEditSongForm" };
+		openLoginModal("Đăng nhập admin để sửa bài hát.");
+		return;
+	}
+
+	state.editingSongId = song.id;
+	elements.modalEyebrow.textContent = "Chỉnh sửa";
+	document.querySelector("#formTitle").textContent = "Sửa nội dung ChordPro";
+	elements.form.elements.title.value = song.title || "";
+	elements.form.elements.artist.value = song.artist || "";
+	elements.form.elements.key.value = song.key || "";
+	elements.form.elements.genre.value = song.genre || "";
+	elements.form.elements.content.value = song.content || "";
+	openModal();
+}
+
+function deleteActiveSong() {
+	if (!state.activeSong) {
+		window.alert("Hãy chọn một bài hát để xóa.");
+		return;
+	}
+	deleteSong(state.activeSong);
+}
+
 function closeModal() {
 	elements.modal.classList.remove("open");
 	elements.modal.setAttribute("aria-hidden", "true");
+	state.editingSongId = null;
+	elements.modalEyebrow.textContent = "Bài hát mới";
+	document.querySelector("#formTitle").textContent = "Dán nội dung ChordPro";
 }
 
 function openSidebar() {

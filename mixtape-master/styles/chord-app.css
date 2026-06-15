@@ -89,6 +89,16 @@ button { cursor: pointer; }
 	gap: 10px;
 }
 
+.admin-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.hidden {
+	display: none !important;
+}
+
 .primary-button, .secondary-button, .tool-button, .icon-button {
 	border: 1px solid var(--line);
 	border-radius: 10px;
@@ -190,6 +200,41 @@ h1, h2, p { margin: 0; }
 }
 
 .status-dot.offline::before { background: #e7b35e; }
+
+.auth-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 10px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.auth-pill::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--muted);
+}
+
+.auth-pill.admin {
+	border-color: rgba(112, 214, 161, 0.35);
+	background: rgba(112, 214, 161, 0.1);
+	color: #8de3b3;
+}
+
+.auth-pill.admin::before { background: var(--success); }
+
+.auth-pill.guest {
+	border-color: rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--muted);
+}
 
 .song-list {
 	flex: 1;

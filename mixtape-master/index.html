@@ -17,10 +17,13 @@
 				<span>Trung Béo <strong>Chords</strong></span>
 			</a>
 			<div class="header-actions">
+				<button class="secondary-button" id="authButton" type="button">
+					Đăng nhập admin
+				</button>
 				<button class="icon-button mobile-only" id="sidebarToggle" type="button" aria-label="Mở thư viện">
 					<i class="fa fa-bars"></i>
 				</button>
-				<button class="primary-button" id="openSongForm" type="button">
+				<button class="primary-button admin-only hidden" id="openSongForm" type="button">
 					<i class="fa fa-plus"></i> Thêm bài hát
 				</button>
 			</div>
@@ -43,6 +46,7 @@
 			<div class="library-meta">
 				<span id="songCount">0 bài hát</span>
 				<span class="status-dot" id="apiStatus">Đang kết nối</span>
+				<span class="auth-pill guest" id="authStatus">Khách</span>
 			</div>
 			<nav class="song-list" id="songList" aria-label="Danh sách bài hát"></nav>
 			<div class="sidebar-footer">
@@ -67,6 +71,14 @@
 					<div class="key-display">
 						<span>Tông</span>
 						<strong id="currentKey">--</strong>
+					</div>
+					<div class="admin-actions admin-only hidden" id="adminActions" aria-label="Tác vụ quản trị">
+						<button class="secondary-button" id="editSongButton" type="button" title="Sửa bài hát hiện tại">
+							<i class="fa fa-pencil"></i> Sửa bài hát
+						</button>
+						<button class="secondary-button" id="deleteSongButton" type="button" title="Xóa bài hát hiện tại">
+							<i class="fa fa-trash"></i> Xóa bài hát
+						</button>
 					</div>
 					<div class="transpose-controls" aria-label="Chuyển tông">
 						<button class="tool-button" id="transposeDown" type="button" title="Hạ nửa cung">
@@ -98,7 +110,7 @@
 		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="formTitle">
 			<div class="modal-header">
 				<div>
-					<span class="eyebrow">Bài hát mới</span>
+					<span class="eyebrow" id="songModalEyebrow">Bài hát mới</span>
 					<h2 id="formTitle">Dán nội dung ChordPro</h2>
 				</div>
 				<button class="icon-button" type="button" data-close-modal aria-label="Đóng">
@@ -133,6 +145,34 @@
 					<button class="secondary-button" type="button" data-close-modal>Hủy</button>
 					<button class="primary-button" type="submit">
 						<i class="fa fa-save"></i> Lưu bài hát
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<div class="modal" id="loginModal" aria-hidden="true">
+		<div class="modal-backdrop" data-close-login-modal></div>
+		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+			<div class="modal-header">
+				<div>
+					<span class="eyebrow">Admin</span>
+					<h2 id="loginTitle">Đăng nhập quản trị</h2>
+				</div>
+				<button class="icon-button" type="button" data-close-login-modal aria-label="Đóng">
+					<i class="fa fa-times"></i>
+				</button>
+			</div>
+			<form id="loginForm">
+				<label>
+					<span>Mật khẩu admin</span>
+					<input name="password" type="password" required placeholder="Nhập mật khẩu admin">
+				</label>
+				<div class="form-message" id="loginMessage"></div>
+				<div class="modal-actions">
+					<button class="secondary-button" type="button" data-close-login-modal>Hủy</button>
+					<button class="primary-button" type="submit">
+						<i class="fa fa-sign-in"></i> Đăng nhập
 					</button>
 				</div>
 			</form>

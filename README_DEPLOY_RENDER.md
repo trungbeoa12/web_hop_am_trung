@@ -13,6 +13,20 @@ Khi app khởi động, backend tự chạy `CREATE TABLE IF NOT EXISTS` thông 
 `Base.metadata.create_all(...)`, nên bảng `songs` sẽ được tạo nếu database còn
 trống.
 
+## Đăng Nhập Admin
+
+Backend giờ tách quyền ghi dữ liệu ra khỏi quyền đọc. Người dùng thường chỉ có
+thể xem/tìm bài hát; các thao tác thêm/xóa cần đăng nhập admin trên frontend.
+
+Trên Render, đặt các biến môi trường:
+
+- `ADMIN_PASSWORD=<mat_khau_admin>`
+- `ADMIN_TOKEN_SECRET=<chuoi_bi_mat_ky_token>`
+
+Nếu bạn chưa muốn đổi ngay cấu hình cũ, backend vẫn chấp nhận `SECRET_KEY` như
+giá trị dự phòng cho mật khẩu và secret ký token, nhưng nên chuyển sang hai biến
+riêng biệt ở trên để rõ trách nhiệm hơn.
+
 ## Deploy Render
 
 1. Vào Render, chọn **New → Web Service** và kết nối GitHub repository.
@@ -21,9 +35,10 @@ trống.
    - Build Command: `pip install -r requirements.txt`
    - Start Command: `gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
 3. Cấu hình Environment Variables:
-   - `SECRET_KEY=<chuoi_bi_mat>`
    - `ALLOWED_ORIGINS=https://ten-domain-vercel-cua-toi.vercel.app`
    - `DATABASE_URL=postgresql://...` hoặc giá trị `postgres://...` từ Render/Supabase
+   - `ADMIN_PASSWORD=<mat_khau_admin>`
+   - `ADMIN_TOKEN_SECRET=<chuoi_bi_mat_ky_token>`
 4. Sau khi deploy, kiểm tra `https://ten-backend-render.onrender.com/health`.
 
 Nếu cần cho phép môi trường dev, đặt nhiều origin cách nhau bởi dấu phẩy:
@@ -38,12 +53,10 @@ Giữ nguyên `vercel.json`, sau đó đặt Environment Variables trên Vercel:
 
 ```text
 API_BASE_URL=https://ten-backend-render.onrender.com
-API_SECRET_KEY=<SECRET_KEY giống backend>
 ```
 
-`api/config.js` cung cấp các giá trị này cho frontend tại runtime. Vì secret được
-gửi tới trình duyệt, cơ chế này chỉ hạn chế thao tác ghi thông thường, không phải
-một lớp xác thực bí mật tuyệt đối.
+`api/config.js` chỉ cung cấp URL backend cho frontend tại runtime. Mật khẩu admin
+không được gửi xuống trình duyệt.
 
 ## Chạy Backend Local
 
@@ -51,6 +64,8 @@ một lớp xác thực bí mật tuyệt đối.
 cd backend
 pip install -r requirements.txt
 export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require'
+export ADMIN_PASSWORD='your-admin-password'
+export ADMIN_TOKEN_SECRET='your-token-secret'
 uvicorn main:app --reload
 ```
 
