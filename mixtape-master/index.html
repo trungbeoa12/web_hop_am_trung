@@ -1,186 +1,107 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-	<title>Trung Béo Chords</title>
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="description" content="Thư viện hợp âm cá nhân">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<link rel="stylesheet" href="plugins/font-awesome-4.7.0/css/font-awesome.min.css">
-	<link rel="stylesheet" href="styles/chord-app.css">
+  <title>Trung Beo Chords | Landing Page</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="Landing page cho Trung Beo Chords va ban nhac live.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles/landing.css">
 </head>
 <body>
-	<div class="app-shell">
-		<header class="app-header">
-			<a class="brand" href="#" aria-label="Trang chủ">
-				<span class="brand-mark">TB</span>
-				<span>Trung Béo <strong>Chords</strong></span>
-			</a>
-			<div class="header-actions">
-				<button class="secondary-button" id="authButton" type="button">
-					Đăng nhập admin
-				</button>
-				<button class="icon-button mobile-only" id="sidebarToggle" type="button" aria-label="Mở thư viện">
-					<i class="fa fa-bars"></i>
-				</button>
-				<button class="primary-button admin-only hidden" id="openSongForm" type="button">
-					<i class="fa fa-plus"></i> Thêm bài hát
-				</button>
-			</div>
-		</header>
+  <header class="topbar">
+    <div class="site-wrap">
+      <a class="brand" href="index.html" aria-label="Trang chu Trung Beo Chords">
+        <span class="brand-mark">TB</span>
+        <span class="brand-name">Trung Beo <span>Chords</span></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-sub" href="chords.html">Thu vien hop am</a>
+        <a class="btn btn-main" href="chords.html">Bat dau ngay</a>
+      </div>
+    </div>
+  </header>
 
-		<aside class="sidebar" id="sidebar">
-			<div class="sidebar-heading">
-				<div>
-					<span class="eyebrow">Bộ sưu tập</span>
-					<h2>Thư viện bài hát</h2>
-				</div>
-				<button class="icon-button mobile-only" id="closeSidebar" type="button" aria-label="Đóng thư viện">
-					<i class="fa fa-times"></i>
-				</button>
-			</div>
-			<label class="search-box">
-				<i class="fa fa-search"></i>
-				<input id="songSearch" type="search" placeholder="Tìm bài hát, ca sĩ..." autocomplete="off">
-			</label>
-			<div class="library-meta">
-				<span id="songCount">0 bài hát</span>
-				<span class="status-dot" id="apiStatus">Đang kết nối</span>
-				<span class="auth-pill guest" id="authStatus">Khách</span>
-			</div>
-			<nav class="song-list" id="songList" aria-label="Danh sách bài hát"></nav>
-			<div class="sidebar-footer">
-				<span>ChordPro · Vanilla JS</span>
-				<span>Dark stage mode</span>
-			</div>
-		</aside>
+  <main>
+    <section class="hero">
+      <div class="site-wrap hero-grid">
+        <div>
+          <span class="kicker">LIVE MUSIC NOTEBOOK</span>
+          <h1>Playlist, Hop Am va Dem Dien cua Trung Beo</h1>
+          <p>
+            Day la landing page moi de gioi thieu chat rieng cua Trung Beo Chords.
+            Toan bo anh duoc lay tu bo images_landingpage ban vua chuan bi,
+            ket hop thanh mot trinh dien visual de dan vao thu vien hop am.
+          </p>
+          <div class="top-actions">
+            <a class="btn btn-main" href="chords.html">Mo thu vien hop am</a>
+            <a class="btn btn-sub" href="#gallery">Xem gallery</a>
+          </div>
+        </div>
+        <figure class="hero-card">
+          <img src="images_landingpage/fullband2.jpg" alt="Trung Beo Chords full band tren san khau">
+          <figcaption class="hero-note">Live Session · Full Band Mood</figcaption>
+        </figure>
+      </div>
+    </section>
 
-		<main class="main-content">
-			<section class="song-hero">
-				<div class="hero-art" aria-hidden="true"></div>
-				<div class="hero-copy">
-					<span class="eyebrow">Đang mở</span>
-					<h1 id="songTitle">Chọn một bài hát</h1>
-					<p id="songArtist">Hợp âm và lời nhạc sẽ xuất hiện tại đây.</p>
-					<div class="song-tags" id="songTags"></div>
-				</div>
-			</section>
+    <section class="stats">
+      <div class="site-wrap stats-grid">
+        <div class="stat">
+          <strong>16</strong>
+          <span>anh trong bo landing moi</span>
+        </div>
+        <div class="stat">
+          <strong>100%</strong>
+          <span>dung anh that tu folder cua ban</span>
+        </div>
+        <div class="stat">
+          <strong>1 click</strong>
+          <span>di thang vao trang hop am</span>
+        </div>
+        <div class="stat">
+          <strong>Mobile</strong>
+          <span>toi uu giao dien responsive</span>
+        </div>
+      </div>
+    </section>
 
-			<section class="viewer-card">
-				<div class="viewer-toolbar">
-					<div class="key-display">
-						<span>Tông</span>
-						<strong id="currentKey">--</strong>
-					</div>
-					<div class="admin-actions admin-only hidden" id="adminActions" aria-label="Tác vụ quản trị">
-						<button class="secondary-button" id="editSongButton" type="button" title="Sửa bài hát hiện tại">
-							<i class="fa fa-pencil"></i> Sửa bài hát
-						</button>
-						<button class="secondary-button" id="deleteSongButton" type="button" title="Xóa bài hát hiện tại">
-							<i class="fa fa-trash"></i> Xóa bài hát
-						</button>
-					</div>
-					<div class="transpose-controls" aria-label="Chuyển tông">
-						<button class="tool-button" id="transposeDown" type="button" title="Hạ nửa cung">
-							<i class="fa fa-minus"></i> 1
-						</button>
-						<span id="transposeValue">Nguyên bản</span>
-						<button class="tool-button" id="transposeUp" type="button" title="Tăng nửa cung">
-							<i class="fa fa-plus"></i> 1
-						</button>
-						<button class="icon-button" id="resetTranspose" type="button" title="Về tông gốc">
-							<i class="fa fa-undo"></i>
-						</button>
-					</div>
-				</div>
-				<div class="chord-sheet" id="chordSheet" aria-live="polite">
-					<div class="empty-state">
-						<i class="fa fa-music"></i>
-						<p>Chọn bài hát trong thư viện để bắt đầu chơi.</p>
-					</div>
-				</div>
-			</section>
-		</main>
-	</div>
+    <section class="gallery" id="gallery">
+      <div class="site-wrap">
+        <div class="gallery-head">
+          <h2>Khoanh khac tren san khau</h2>
+          <p>
+            Mot bo cuc gallery co nhip, uu tien mau am va texture concert de giu duoc chat rieng,
+            khong giong landing page mau cong nghiep.
+          </p>
+        </div>
+        <div class="gallery-grid">
+          <figure class="tile tile-1"><img src="images_landingpage/trungbeo.jpg" alt="Trung Beo chan dung"></figure>
+          <figure class="tile tile-2"><img src="images_landingpage/fullband.jpg" alt="Ban nhac day du tren san khau"></figure>
+          <figure class="tile tile-3"><img src="images_landingpage/live1.jpg" alt="Khoanh khac dien live 1"></figure>
+          <figure class="tile tile-4"><img src="images_landingpage/live2.jpg" alt="Khoanh khac dien live 2"></figure>
+          <figure class="tile tile-5"><img src="images_landingpage/live3.jpg" alt="Khoanh khac dien live 3"></figure>
+          <figure class="tile tile-6"><img src="images_landingpage/wait.jpg" alt="Khoanh khac cho truoc gio dien"></figure>
+          <figure class="tile tile-7"><img src="images_landingpage/the_alphaband.jpg" alt="The Alphaband"></figure>
+          <figure class="tile tile-8"><img src="images_landingpage/djtus.jpg" alt="DJ Tus"></figure>
+          <figure class="tile tile-9"><img src="images_landingpage/cong_cf.jpg" alt="Cong CF"></figure>
+        </div>
+      </div>
+    </section>
 
-	<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <section class="cta">
+      <div class="site-wrap cta-box">
+        <div>
+          <h3>San sang vao che do choi nhac?</h3>
+          <p>Thu vien hop am, transpose, va admin login van duoc giu nguyen o trang chords.</p>
+        </div>
+        <a class="btn btn-main" href="chords.html">Di toi Trung Beo Chords App</a>
+      </div>
+    </section>
+  </main>
 
-	<div class="modal" id="songModal" aria-hidden="true">
-		<div class="modal-backdrop" data-close-modal></div>
-		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="formTitle">
-			<div class="modal-header">
-				<div>
-					<span class="eyebrow" id="songModalEyebrow">Bài hát mới</span>
-					<h2 id="formTitle">Dán nội dung ChordPro</h2>
-				</div>
-				<button class="icon-button" type="button" data-close-modal aria-label="Đóng">
-					<i class="fa fa-times"></i>
-				</button>
-			</div>
-			<form id="songForm">
-				<div class="form-grid">
-					<label>
-						<span>Tên bài hát</span>
-						<input name="title" required placeholder="Ví dụ: Cơn mưa ngang qua">
-					</label>
-					<label>
-						<span>Ca sĩ / tác giả</span>
-						<input name="artist" placeholder="Ví dụ: Sơn Tùng M-TP">
-					</label>
-					<label>
-						<span>Tông gốc</span>
-						<input name="key" placeholder="Ví dụ: C, Am, F#">
-					</label>
-					<label>
-						<span>Thể loại</span>
-						<input name="genre" placeholder="Ví dụ: Ballad">
-					</label>
-				</div>
-				<label>
-					<span>Nội dung ChordPro</span>
-					<textarea name="content" required rows="13" placeholder="{title: Tên bài hát}&#10;{artist: Ca sĩ}&#10;{key: C}&#10;&#10;[C]Ngày em [G]đến, trời bỗng [Am]xanh hơn..."></textarea>
-				</label>
-				<div class="form-message" id="formMessage"></div>
-				<div class="modal-actions">
-					<button class="secondary-button" type="button" data-close-modal>Hủy</button>
-					<button class="primary-button" type="submit">
-						<i class="fa fa-save"></i> Lưu bài hát
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-
-	<div class="modal" id="loginModal" aria-hidden="true">
-		<div class="modal-backdrop" data-close-login-modal></div>
-		<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-			<div class="modal-header">
-				<div>
-					<span class="eyebrow">Admin</span>
-					<h2 id="loginTitle">Đăng nhập quản trị</h2>
-				</div>
-				<button class="icon-button" type="button" data-close-login-modal aria-label="Đóng">
-					<i class="fa fa-times"></i>
-				</button>
-			</div>
-			<form id="loginForm">
-				<label>
-					<span>Mật khẩu admin</span>
-					<input name="password" type="password" required placeholder="Nhập mật khẩu admin">
-				</label>
-				<div class="form-message" id="loginMessage"></div>
-				<div class="modal-actions">
-					<button class="secondary-button" type="button" data-close-login-modal>Hủy</button>
-					<button class="primary-button" type="submit">
-						<i class="fa fa-sign-in"></i> Đăng nhập
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-
-	<script src="https://cdn.jsdelivr.net/npm/chordsheetjs@15.4.0/lib/bundle.min.js"></script>
-	<script src="js/config.js"></script>
-	<script src="js/chord-app.js"></script>
+  <footer class="footer">
+    <div class="site-wrap">Trung Beo Chords · Landing page update</div>
+  </footer>
 </body>
 </html>
