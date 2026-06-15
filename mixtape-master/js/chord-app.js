@@ -1,6 +1,9 @@
 "use strict";
 
-const API_URL = "/api/v1/songs";
+// Đọc từ js/config.js (đặt apiBaseUrl = URL Railway của bạn)
+const _cfg = window.CHORD_CONFIG || {};
+const API_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "") + "/api/v1/songs";
+const API_SECRET = _cfg.secretKey || "";
 const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_INDEX = {
 	"C": 0, "B#": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
@@ -72,7 +75,8 @@ const DEMO_SONGS = [
 const state = {
 	songs: [],
 	activeSong: null,
-	transpose: 0
+	transpose: 0,
+	apiOnline: false
 };
 
 const elements = {
@@ -125,9 +129,11 @@ async function loadSongs() {
 		if (!response.ok) throw new Error(`API trả về ${response.status}`);
 		const payload = await response.json();
 		state.songs = normalizeSongList(payload);
+		state.apiOnline = true;
 		setApiStatus("Đã kết nối", false);
 	} catch (error) {
 		state.songs = loadLocalSongs();
+		state.apiOnline = false;
 		setApiStatus("Dữ liệu cục bộ", true);
 	}
 
@@ -154,7 +160,8 @@ function normalizeSong(song) {
 function loadLocalSongs() {
 	try {
 		const saved = JSON.parse(localStorage.getItem("trung-beo-chords") || "[]");
-		return [...saved.map(normalizeSong), ...DEMO_SONGS];
+		const deletedIds = JSON.parse(localStorage.getItem("trung-beo-deleted-songs") || "[]");
+		return [...saved.map(normalizeSong), ...DEMO_SONGS].filter((song) => !deletedIds.includes(String(song.id)));
 	} catch (error) {
 		return [...DEMO_SONGS];
 	}
@@ -168,10 +175,11 @@ function renderSongList(query = "") {
 
 	elements.songCount.textContent = `${songs.length} bài hát`;
 	elements.songList.replaceChildren(...songs.map((song, index) => {
-		const button = document.createElement("button");
-		button.type = "button";
-		button.className = `song-list-item${state.activeSong?.id === song.id ? " active" : ""}`;
-		button.addEventListener("click", () => selectSong(song.id));
+		const item = createElement("div", `song-list-item${state.activeSong?.id === song.id ? " active" : ""}`);
+		const selectButton = document.createElement("button");
+		selectButton.type = "button";
+		selectButton.className = "song-select";
+		selectButton.addEventListener("click", () => selectSong(song.id));
 
 		const number = createElement("span", "song-index", String(index + 1).padStart(2, "0"));
 		const copy = createElement("span");
@@ -179,8 +187,18 @@ function renderSongList(query = "") {
 			createElement("span", "song-list-title", song.title),
 			createElement("span", "song-list-artist", song.artist)
 		);
-		button.append(number, copy, createElement("span", "song-list-key", song.key));
-		return button;
+		selectButton.append(number, copy, createElement("span", "song-list-key", song.key));
+
+		const deleteButton = document.createElement("button");
+		deleteButton.type = "button";
+		deleteButton.className = "song-delete";
+		deleteButton.title = `Xóa ${song.title}`;
+		deleteButton.setAttribute("aria-label", `Xóa ${song.title}`);
+		deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
+		deleteButton.addEventListener("click", () => deleteSong(song));
+
+		item.append(selectButton, deleteButton);
+		return item;
 	}));
 }
 
@@ -203,6 +221,68 @@ function renderActiveSong() {
 	);
 	renderChordSheet(song.content, state.transpose);
 	updateTransposeDisplay();
+}
+
+async function deleteSong(song) {
+	const confirmed = window.confirm(`Xóa "${song.title}" khỏi thư viện? Thao tác này không thể hoàn tác.`);
+	if (!confirmed) return;
+
+	if (state.apiOnline) {
+		try {
+			const response = await fetch(`${API_URL}/${encodeURIComponent(song.id)}`, {
+				method: "DELETE",
+				headers: API_SECRET ? { "X-Secret-Key": API_SECRET } : {}
+			});
+			if (!response.ok) throw new Error(`API trả về ${response.status}`);
+		} catch (error) {
+			window.alert(`Không thể xóa bài hát: ${error.message}`);
+			return;
+		}
+	} else {
+		removeLocalSong(song.id);
+	}
+
+	const deletedIndex = state.songs.findIndex((item) => String(item.id) === String(song.id));
+	state.songs = state.songs.filter((item) => String(item.id) !== String(song.id));
+	const wasActive = String(state.activeSong?.id) === String(song.id);
+
+	if (wasActive) {
+		const nextSong = state.songs[Math.min(deletedIndex, state.songs.length - 1)];
+		if (nextSong) {
+			selectSong(nextSong.id);
+			return;
+		}
+		clearActiveSong();
+	}
+
+	renderSongList(elements.search.value);
+}
+
+function removeLocalSong(id) {
+	const stringId = String(id);
+	const savedSongs = JSON.parse(localStorage.getItem("trung-beo-chords") || "[]")
+		.filter((song) => String(song.id) !== stringId);
+	const deletedIds = new Set(JSON.parse(localStorage.getItem("trung-beo-deleted-songs") || "[]").map(String));
+	deletedIds.add(stringId);
+	localStorage.setItem("trung-beo-chords", JSON.stringify(savedSongs));
+	localStorage.setItem("trung-beo-deleted-songs", JSON.stringify([...deletedIds]));
+}
+
+function clearActiveSong() {
+	state.activeSong = null;
+	state.transpose = 0;
+	elements.title.textContent = "Thư viện đang trống";
+	elements.artist.textContent = "Thêm một bài hát ChordPro để bắt đầu.";
+	elements.tags.replaceChildren();
+	elements.key.textContent = "--";
+	elements.transposeValue.textContent = "Nguyên bản";
+	const emptyState = createElement("div", "empty-state");
+	emptyState.append(
+		createElement("i", "fa fa-music"),
+		createElement("p", "", "Chưa có bài hát trong thư viện.")
+	);
+	elements.sheet.replaceChildren(emptyState);
+	renderSongList(elements.search.value);
 }
 
 function renderChordSheet(source, steps) {
@@ -314,12 +394,16 @@ async function saveSong(event) {
 	try {
 		const response = await fetch(API_URL, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: {
+				"Content-Type": "application/json",
+				...(API_SECRET ? { "X-Secret-Key": API_SECRET } : {})
+			},
 			body: JSON.stringify(song)
 		});
 		if (!response.ok) throw new Error(`API trả về ${response.status}`);
 		const savedSong = normalizeSong(await response.json());
 		state.songs.unshift(savedSong);
+		state.apiOnline = true;
 		setApiStatus("Đã kết nối", false);
 	} catch (error) {
 		const localSongs = JSON.parse(localStorage.getItem("trung-beo-chords") || "[]");
