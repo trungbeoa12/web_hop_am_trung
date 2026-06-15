@@ -1,24 +1,25 @@
 """
-FastAPI backend cho website Hợp Âm Trung Béo
-- SQLite với WAL mode (tránh lỗi Database Lock)
-- DB_PATH cấu hình qua biến môi trường, fallback về backend/songs.db
+FastAPI backend cho website Hợp Âm Trung Béo.
+- DATABASE_URL cấu hình qua biến môi trường cho PostgreSQL trên Render/Supabase
+- SQLAlchemy quản lý kết nối và tạo bảng nếu chưa tồn tại
 - CORS cho phép Vercel frontend truy cập
 - SECRET_KEY bảo vệ các API ghi dữ liệu
 """
 import os
-import sqlite3
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Generator, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
+from sqlalchemy import Column, Integer, String, Text, create_engine, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # ──────────────────────────────────────────────
 # Cấu hình từ biến môi trường
 # ──────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get("DB_PATH") or os.path.join(BASE_DIR, "songs.db")
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 
 # Các origin được phép gọi API (thêm domain Vercel của bạn)
@@ -27,31 +28,66 @@ _raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 
+def _normalize_database_url(raw_url: str) -> str:
+    """Chuẩn hóa DATABASE_URL để SQLAlchemy dùng được trên Render/Supabase."""
+    database_url = raw_url.strip()
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    parts = urlsplit(database_url)
+    if parts.scheme.startswith("postgresql"):
+        query_params = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query_params.setdefault("sslmode", "require")
+        database_url = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query_params), parts.fragment)
+        )
+
+    return database_url
+
+
+RAW_DATABASE_URL = os.getenv("DATABASE_URL", "")
+if not RAW_DATABASE_URL:
+    raise RuntimeError("Missing DATABASE_URL environment variable")
+
+DATABASE_URL = _normalize_database_url(RAW_DATABASE_URL)
+
+
+def _safe_database_label(database_url: str) -> str:
+    parts = urlsplit(database_url)
+    database_name = parts.path.lstrip("/") or "default"
+    return f"{parts.scheme}://{parts.hostname or 'unknown'}/{database_name}"
+
+
+Base = declarative_base()
+
+
+class Song(Base):
+    __tablename__ = "songs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    artist = Column(String, nullable=False, default="", server_default="")
+    key = Column(String, nullable=False, default="C", server_default="C")
+    genre = Column(String, nullable=False, default="", server_default="")
+    content = Column(Text, nullable=False, default="", server_default="")
+
+
+engine: Engine = create_engine(
+    DATABASE_URL,
+    future=True,
+    pool_pre_ping=True,
+)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
+
 # ──────────────────────────────────────────────
 # Khởi tạo database khi app start
 # ──────────────────────────────────────────────
-def _init_db():
-    """Tạo thư mục và bảng songs nếu chưa tồn tại."""
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
-
-    conn = sqlite3.connect(DB_PATH)
-    # BẬT WAL mode: cho phép đọc song song với ghi, tránh lỗi "database is locked"
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")  # hiệu suất tốt hơn so với FULL
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS songs (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            title   TEXT NOT NULL,
-            artist  TEXT NOT NULL DEFAULT '',
-            key     TEXT NOT NULL DEFAULT 'C',
-            genre   TEXT NOT NULL DEFAULT '',
-            content TEXT NOT NULL DEFAULT ''
-        )
-    """)
-    conn.commit()
-    conn.close()
+def _init_db() -> None:
+    """Tạo bảng songs nếu chưa tồn tại."""
+    Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
@@ -77,15 +113,12 @@ app.add_middleware(
 # ──────────────────────────────────────────────
 # Dependency: kết nối DB với WAL được bật
 # ──────────────────────────────────────────────
-def get_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
     try:
-        yield conn
+        yield db
     finally:
-        conn.close()
+        db.close()
 
 
 # ──────────────────────────────────────────────
@@ -125,45 +158,58 @@ class SongIn(BaseModel):
 @app.get("/health")
 def health():
     """Kiểm tra server có sống không."""
-    return {"status": "ok", "db": DB_PATH}
+    return {"status": "ok", "db": _safe_database_label(DATABASE_URL)}
+
+
+def _song_to_dict(song: Song) -> dict:
+    return {
+        "id": song.id,
+        "title": song.title,
+        "artist": song.artist,
+        "key": song.key,
+        "genre": song.genre,
+        "content": song.content,
+    }
 
 
 @app.get("/api/v1/songs")
-def list_songs(db: sqlite3.Connection = Depends(get_db)):
+def list_songs(db: Session = Depends(get_db)):
     """Trả về toàn bộ danh sách bài hát, mới nhất trước."""
-    rows = db.execute(
-        "SELECT id, title, artist, key, genre, content FROM songs ORDER BY id DESC"
-    ).fetchall()
-    return [dict(row) for row in rows]
+    songs = db.execute(select(Song).order_by(Song.id.desc())).scalars().all()
+    return [_song_to_dict(song) for song in songs]
 
 
 @app.post("/api/v1/songs", status_code=201)
 def create_song(
     song: SongIn,
-    db: sqlite3.Connection = Depends(get_db),
+    db: Session = Depends(get_db),
     _=Depends(require_secret),
 ):
     """Thêm bài hát mới (yêu cầu X-Secret-Key nếu SECRET_KEY được cấu hình)."""
-    cur = db.execute(
-        "INSERT INTO songs (title, artist, key, genre, content) VALUES (?, ?, ?, ?, ?)",
-        (song.title.strip(), song.artist.strip(), song.key.strip(), song.genre.strip(), song.content),
+    new_song = Song(
+        title=song.title.strip(),
+        artist=song.artist.strip(),
+        key=song.key.strip(),
+        genre=song.genre.strip(),
+        content=song.content,
     )
+    db.add(new_song)
     db.commit()
-    row = db.execute("SELECT * FROM songs WHERE id=?", (cur.lastrowid,)).fetchone()
-    return dict(row)
+    db.refresh(new_song)
+    return _song_to_dict(new_song)
 
 
 @app.delete("/api/v1/songs/{song_id}")
 def delete_song(
     song_id: int,
-    db: sqlite3.Connection = Depends(get_db),
+    db: Session = Depends(get_db),
     _=Depends(require_secret),
 ):
     """Xóa bài hát theo ID (yêu cầu X-Secret-Key nếu SECRET_KEY được cấu hình)."""
-    row = db.execute("SELECT id FROM songs WHERE id=?", (song_id,)).fetchone()
-    if not row:
+    song = db.get(Song, song_id)
+    if not song:
         raise HTTPException(status_code=404, detail=f"Không tìm thấy bài hát id={song_id}")
-    db.execute("DELETE FROM songs WHERE id=?", (song_id,))
+    db.delete(song)
     db.commit()
     return {"ok": True, "deleted_id": song_id}
 

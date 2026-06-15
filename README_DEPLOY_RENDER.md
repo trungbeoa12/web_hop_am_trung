@@ -3,12 +3,15 @@
 Frontend tiếp tục deploy trên Vercel. Backend FastAPI deploy trên Render bằng cấu
 hình tại `render.yaml`.
 
-## Lưu ý về SQLite
+## Database PostgreSQL
 
-Render Free không cung cấp persistent disk. Nếu dùng SQLite, dữ liệu thêm/xóa có
-thể mất sau khi service restart hoặc redeploy. Mặc định backend dùng
-`backend/songs.db`; có thể đặt `DB_PATH` để đổi vị trí file, nhưng điều đó không
-làm dữ liệu bền vững trên gói Free.
+Backend đọc `DATABASE_URL` từ biến môi trường và kết nối bằng SQLAlchemy tới
+PostgreSQL. Với Supabase, dùng connection string do Supabase cung cấp; backend sẽ
+tự chuẩn hóa URL cho SQLAlchemy và thêm `sslmode=require` nếu còn thiếu.
+
+Khi app khởi động, backend tự chạy `CREATE TABLE IF NOT EXISTS` thông qua
+`Base.metadata.create_all(...)`, nên bảng `songs` sẽ được tạo nếu database còn
+trống.
 
 ## Deploy Render
 
@@ -20,7 +23,7 @@ làm dữ liệu bền vững trên gói Free.
 3. Cấu hình Environment Variables:
    - `SECRET_KEY=<chuoi_bi_mat>`
    - `ALLOWED_ORIGINS=https://ten-domain-vercel-cua-toi.vercel.app`
-   - `DB_PATH=/opt/render/project/src/backend/songs.db` hoặc bỏ trống để dùng fallback
+   - `DATABASE_URL=postgresql://...` hoặc giá trị `postgres://...` từ Render/Supabase
 4. Sau khi deploy, kiểm tra `https://ten-backend-render.onrender.com/health`.
 
 Nếu cần cho phép môi trường dev, đặt nhiều origin cách nhau bởi dấu phẩy:
@@ -47,10 +50,27 @@ một lớp xác thực bí mật tuyệt đối.
 ```bash
 cd backend
 pip install -r requirements.txt
+export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require'
 uvicorn main:app --reload
 ```
 
 Kiểm tra tại `http://127.0.0.1:8000/health`.
+
+## SQL Migration Thủ Công
+
+Backend hiện tự tạo bảng `songs`. Nếu muốn tạo thủ công trước trên Supabase SQL
+Editor, dùng câu lệnh:
+
+```sql
+CREATE TABLE IF NOT EXISTS songs (
+   id SERIAL PRIMARY KEY,
+   title VARCHAR NOT NULL,
+   artist VARCHAR NOT NULL DEFAULT '',
+   key VARCHAR NOT NULL DEFAULT 'C',
+   genre VARCHAR NOT NULL DEFAULT '',
+   content TEXT NOT NULL DEFAULT ''
+);
+```
 
 ## Commit Và Push
 

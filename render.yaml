@@ -11,5 +11,5 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
-      - key: DB_PATH
+      - key: DATABASE_URL
         sync: false
