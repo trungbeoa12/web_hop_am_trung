@@ -1,4 +1,4 @@
-# Railway build & deploy config
+# Legacy Railway config. Backend production deployment now uses Render via /render.yaml.
 [build]
 builder = "nixpacks"
 

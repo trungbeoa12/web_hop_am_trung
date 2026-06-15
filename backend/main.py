@@ -1,7 +1,7 @@
 """
 FastAPI backend cho website Hợp Âm Trung Béo
 - SQLite với WAL mode (tránh lỗi Database Lock)
-- Persistent Volume trên Railway (DB_PATH=/data/songs.db)
+- DB_PATH cấu hình qua biến môi trường, fallback về backend/songs.db
 - CORS cho phép Vercel frontend truy cập
 - SECRET_KEY bảo vệ các API ghi dữ liệu
 """
@@ -17,8 +17,8 @@ from pydantic import BaseModel, field_validator
 # ──────────────────────────────────────────────
 # Cấu hình từ biến môi trường
 # ──────────────────────────────────────────────
-# Railway Volume sẽ mount tại /data → file DB sẽ tồn tại sau khi restart
-DB_PATH = os.getenv("DB_PATH", "/data/songs.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("DB_PATH") or os.path.join(BASE_DIR, "songs.db")
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 
 # Các origin được phép gọi API (thêm domain Vercel của bạn)
@@ -166,3 +166,9 @@ def delete_song(
     db.execute("DELETE FROM songs WHERE id=?", (song_id,))
     db.commit()
     return {"ok": True, "deleted_id": song_id}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

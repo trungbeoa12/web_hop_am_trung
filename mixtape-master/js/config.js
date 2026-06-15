@@ -1,12 +1,11 @@
 /**
- * CẤU HÌNH API - Cập nhật sau khi deploy Railway backend
+ * CẤU HÌNH API FALLBACK - runtime config ưu tiên đọc từ /api/config trên Vercel
  *
- * Sau khi Railway cấp URL (ví dụ https://web-hop-am-trung.railway.app),
- * thay giá trị apiBaseUrl bên dưới và push lại lên GitHub.
- * Vercel sẽ tự deploy lại.
+ * Khi deploy, cấu hình API_BASE_URL và API_SECRET_KEY trong Vercel.
+ * Chỉ điền giá trị tại đây khi chạy static site không có endpoint /api/config.
  */
 window.CHORD_CONFIG = {
-    // Ví dụ: "https://web-hop-am-trung-production.up.railway.app"
+    // Ví dụ: "https://ten-backend-render.onrender.com"
     apiBaseUrl: "",
 
     // Nếu bạn bật SECRET_KEY ở backend, điền vào đây để frontend có thể ghi dữ liệu.
