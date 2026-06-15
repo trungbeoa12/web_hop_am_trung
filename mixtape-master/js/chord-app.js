@@ -1,9 +1,10 @@
 "use strict";
 
-// Đọc từ js/config.js (đặt apiBaseUrl = URL Railway của bạn)
+// Ưu tiên đọc cấu hình runtime từ Vercel env qua /api/config.
+const RUNTIME_CONFIG_ENDPOINT = "/api/config";
 const _cfg = window.CHORD_CONFIG || {};
-const API_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "") + "/api/v1/songs";
-const API_SECRET = _cfg.secretKey || "";
+let API_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "") + "/api/v1/songs";
+let API_SECRET = _cfg.secretKey || "";
 const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_INDEX = {
 	"C": 0, "B#": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
@@ -100,8 +101,28 @@ const elements = {
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+	await loadRuntimeConfig();
 	bindEvents();
 	await loadSongs();
+}
+
+async function loadRuntimeConfig() {
+	try {
+		const response = await fetch(RUNTIME_CONFIG_ENDPOINT, {
+			headers: { "Accept": "application/json" },
+			cache: "no-store"
+		});
+		if (!response.ok) return;
+		const runtime = await response.json();
+		if (runtime.apiBaseUrl) {
+			API_URL = String(runtime.apiBaseUrl).replace(/\/$/, "") + "/api/v1/songs";
+		}
+		if (runtime.secretKey) {
+			API_SECRET = String(runtime.secretKey);
+		}
+	} catch (error) {
+		// Giữ nguyên fallback từ window.CHORD_CONFIG khi endpoint không tồn tại.
+	}
 }
 
 function bindEvents() {
