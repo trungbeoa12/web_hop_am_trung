@@ -92,6 +92,31 @@
 							<i class="fa fa-undo"></i>
 						</button>
 					</div>
+					<div class="stage-tools" aria-label="Công cụ sân khấu">
+						<div class="font-controls" aria-label="Cỡ chữ lời và hợp âm">
+							<button class="tool-button compact" id="fontDecrease" type="button" title="Giảm cỡ chữ">
+								<i class="fa fa-font"></i> -
+							</button>
+							<span id="fontSizeValue">18px</span>
+							<button class="tool-button compact" id="fontIncrease" type="button" title="Tăng cỡ chữ">
+								<i class="fa fa-font"></i> +
+							</button>
+						</div>
+						<button class="tool-button" id="autoScrollToggle" type="button" title="Bật tự động cuộn">
+							<i class="fa fa-play"></i> Auto Scroll
+						</button>
+						<label class="speed-control" for="scrollSpeed">
+							<span>Speed</span>
+							<input id="scrollSpeed" type="range" min="1" max="10" step="1" value="4">
+							<strong id="scrollSpeedValue">4</strong>
+						</label>
+						<button class="icon-button" id="scrollTopButton" type="button" title="Về đầu bài" aria-label="Về đầu bài">
+							<i class="fa fa-arrow-up"></i>
+						</button>
+						<button class="tool-button" id="fullscreenToggle" type="button" title="Fullscreen Stage">
+							<i class="fa fa-expand"></i> Fullscreen
+						</button>
+					</div>
 				</div>
 				<div class="chord-sheet" id="chordSheet" aria-live="polite">
 					<div class="empty-state">

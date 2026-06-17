@@ -6,6 +6,12 @@ const _cfg = window.CHORD_CONFIG || {};
 let API_BASE_URL = (_cfg.apiBaseUrl || "").replace(/\/$/, "");
 const ADMIN_TOKEN_STORAGE_KEY = "trung-beo-admin-token";
 let ADMIN_TOKEN = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+const FONT_SIZE_STORAGE_KEY = "trungbeo_chords_font_size";
+const SCROLL_SPEED_STORAGE_KEY = "trungbeo_chords_scroll_speed";
+const FONT_SIZE_MIN = 14;
+const FONT_SIZE_DEFAULT = 18;
+const FONT_SIZE_MAX = 28;
+const FONT_SIZE_STEP = 2;
 const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_INDEX = {
 	"C": 0, "B#": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
@@ -80,7 +86,13 @@ const state = {
 	transpose: 0,
 	apiOnline: false,
 	pendingAction: null,
-	editingSongId: null
+	editingSongId: null,
+	fontSize: readStoredNumber(FONT_SIZE_STORAGE_KEY, FONT_SIZE_DEFAULT, FONT_SIZE_MIN, FONT_SIZE_MAX),
+	scrollSpeed: readStoredNumber(SCROLL_SPEED_STORAGE_KEY, 4, 1, 10),
+	autoScrollActive: false,
+	autoScrollFrame: null,
+	lastScrollFrameTime: null,
+	fullscreenStage: false
 };
 
 const elements = {
@@ -100,6 +112,14 @@ const elements = {
 	key: document.querySelector("#currentKey"),
 	transposeValue: document.querySelector("#transposeValue"),
 	sheet: document.querySelector("#chordSheet"),
+	fontDecrease: document.querySelector("#fontDecrease"),
+	fontIncrease: document.querySelector("#fontIncrease"),
+	fontSizeValue: document.querySelector("#fontSizeValue"),
+	autoScrollToggle: document.querySelector("#autoScrollToggle"),
+	scrollSpeed: document.querySelector("#scrollSpeed"),
+	scrollSpeedValue: document.querySelector("#scrollSpeedValue"),
+	scrollTopButton: document.querySelector("#scrollTopButton"),
+	fullscreenToggle: document.querySelector("#fullscreenToggle"),
 	modal: document.querySelector("#songModal"),
 	modalEyebrow: document.querySelector("#songModalEyebrow"),
 	form: document.querySelector("#songForm"),
@@ -116,6 +136,7 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
 	await loadRuntimeConfig();
 	bindEvents();
+	applyStoredStageSettings();
 	await validateAdminSession();
 	updateAuthUi();
 	await loadSongs();
@@ -142,6 +163,12 @@ function bindEvents() {
 	document.querySelector("#transposeDown").addEventListener("click", () => changeTranspose(-1));
 	document.querySelector("#transposeUp").addEventListener("click", () => changeTranspose(1));
 	document.querySelector("#resetTranspose").addEventListener("click", () => setTranspose(0));
+	elements.fontDecrease.addEventListener("click", () => changeFontSize(-FONT_SIZE_STEP));
+	elements.fontIncrease.addEventListener("click", () => changeFontSize(FONT_SIZE_STEP));
+	elements.autoScrollToggle.addEventListener("click", toggleAutoScroll);
+	elements.scrollSpeed.addEventListener("input", handleScrollSpeedChange);
+	elements.scrollTopButton.addEventListener("click", scrollToSongTop);
+	elements.fullscreenToggle.addEventListener("click", toggleFullscreenStage);
 	elements.openSongForm.addEventListener("click", openSongEntryForm);
 	elements.editSongButton.addEventListener("click", openEditSongForm);
 	elements.deleteSongButton.addEventListener("click", deleteActiveSong);
@@ -158,8 +185,12 @@ function bindEvents() {
 			closeModal();
 			closeLoginModal();
 			closeSidebar();
+			if (state.fullscreenStage && !document.fullscreenElement) {
+				exitFullscreenStage();
+			}
 		}
 	});
+	document.addEventListener("fullscreenchange", syncFullscreenStageState);
 }
 
 function apiUrl(path) {
@@ -237,6 +268,7 @@ function handleAuthButtonClick() {
 }
 
 function logoutAdmin() {
+	stopAutoScroll();
 	clearAdminToken();
 	state.pendingAction = null;
 	setApiStatus("Đã đăng xuất", false);
@@ -317,6 +349,7 @@ async function handleAdminLogin(event) {
 }
 
 async function loadSongs() {
+	stopAutoScroll();
 	try {
 		const response = await fetch(apiUrl("/api/v1/songs"), { headers: { "Accept": "application/json" } });
 		if (!response.ok) throw new Error(`API trả về ${response.status}`);
@@ -400,6 +433,7 @@ function renderSongList(query = "") {
 }
 
 function selectSong(id) {
+	stopAutoScroll();
 	state.activeSong = state.songs.find((song) => String(song.id) === String(id));
 	state.transpose = 0;
 	renderSongList(elements.search.value);
@@ -489,6 +523,7 @@ function removeLocalSong(id) {
 }
 
 function clearActiveSong() {
+	stopAutoScroll();
 	state.activeSong = null;
 	state.transpose = 0;
 	elements.title.textContent = "Thư viện đang trống";
@@ -506,6 +541,7 @@ function clearActiveSong() {
 }
 
 function renderChordSheet(source, steps) {
+	stopAutoScroll();
 	const fragment = document.createDocumentFragment();
 	const parsedSource = parseWithChordSheetJs(source);
 
@@ -590,9 +626,154 @@ function changeTranspose(amount) {
 }
 
 function setTranspose(value) {
+	if (!state.activeSong) return;
 	state.transpose = Math.max(-11, Math.min(11, value));
 	renderChordSheet(state.activeSong.content, state.transpose);
 	updateTransposeDisplay();
+}
+
+function applyStoredStageSettings() {
+	applyFontSize();
+	updateAutoScrollButton();
+	updateScrollSpeedDisplay();
+}
+
+function changeFontSize(amount) {
+	state.fontSize = clamp(state.fontSize + amount, FONT_SIZE_MIN, FONT_SIZE_MAX);
+	localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(state.fontSize));
+	applyFontSize();
+}
+
+function applyFontSize() {
+	elements.sheet.style.fontSize = `${state.fontSize}px`;
+	elements.fontSizeValue.textContent = `${state.fontSize}px`;
+	elements.fontDecrease.disabled = state.fontSize <= FONT_SIZE_MIN;
+	elements.fontIncrease.disabled = state.fontSize >= FONT_SIZE_MAX;
+}
+
+function toggleAutoScroll() {
+	if (state.autoScrollActive) {
+		stopAutoScroll();
+		return;
+	}
+	startAutoScroll();
+}
+
+function startAutoScroll() {
+	if (!state.activeSong || state.autoScrollActive) return;
+	state.autoScrollActive = true;
+	state.lastScrollFrameTime = null;
+	updateAutoScrollButton();
+	state.autoScrollFrame = window.requestAnimationFrame(stepAutoScroll);
+}
+
+function stopAutoScroll() {
+	if (state.autoScrollFrame) {
+		window.cancelAnimationFrame(state.autoScrollFrame);
+	}
+	state.autoScrollActive = false;
+	state.autoScrollFrame = null;
+	state.lastScrollFrameTime = null;
+	updateAutoScrollButton();
+}
+
+function stepAutoScroll(timestamp) {
+	if (!state.autoScrollActive) return;
+
+	const scroller = document.scrollingElement || document.documentElement;
+	const maxScroll = scroller.scrollHeight - window.innerHeight;
+	if (window.scrollY >= maxScroll - 2) {
+		stopAutoScroll();
+		return;
+	}
+
+	if (state.lastScrollFrameTime === null) {
+		state.lastScrollFrameTime = timestamp;
+	}
+	const elapsed = timestamp - state.lastScrollFrameTime;
+	state.lastScrollFrameTime = timestamp;
+	const pixelsPerSecond = state.scrollSpeed * 8;
+	window.scrollBy(0, pixelsPerSecond * (elapsed / 1000));
+	state.autoScrollFrame = window.requestAnimationFrame(stepAutoScroll);
+}
+
+function updateAutoScrollButton() {
+	if (!elements.autoScrollToggle) return;
+	elements.autoScrollToggle.classList.toggle("active", state.autoScrollActive);
+	elements.autoScrollToggle.title = state.autoScrollActive ? "Dừng tự động cuộn" : "Bật tự động cuộn";
+	elements.autoScrollToggle.innerHTML = state.autoScrollActive
+		? '<i class="fa fa-pause"></i> Stop Scroll'
+		: '<i class="fa fa-play"></i> Auto Scroll';
+}
+
+function handleScrollSpeedChange(event) {
+	state.scrollSpeed = clamp(Number(event.target.value) || 4, 1, 10);
+	localStorage.setItem(SCROLL_SPEED_STORAGE_KEY, String(state.scrollSpeed));
+	updateScrollSpeedDisplay();
+}
+
+function updateScrollSpeedDisplay() {
+	elements.scrollSpeed.value = String(state.scrollSpeed);
+	elements.scrollSpeedValue.textContent = String(state.scrollSpeed);
+}
+
+function scrollToSongTop() {
+	stopAutoScroll();
+	const top = elements.sheet.getBoundingClientRect().top + window.scrollY - 90;
+	window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
+async function toggleFullscreenStage() {
+	if (state.fullscreenStage || document.fullscreenElement) {
+		await exitFullscreenStage();
+		return;
+	}
+	await enterFullscreenStage();
+}
+
+async function enterFullscreenStage() {
+	state.fullscreenStage = true;
+	document.body.classList.add("fullscreen-stage");
+	updateFullscreenButton();
+	closeSidebar();
+
+	if (document.documentElement.requestFullscreen) {
+		try {
+			await document.documentElement.requestFullscreen();
+		} catch (error) {
+			// CSS fullscreen-stage vẫn là fallback khi browser chặn Fullscreen API.
+		}
+	}
+}
+
+async function exitFullscreenStage() {
+	state.fullscreenStage = false;
+	document.body.classList.remove("fullscreen-stage");
+	updateFullscreenButton();
+
+	if (document.fullscreenElement && document.exitFullscreen) {
+		try {
+			await document.exitFullscreen();
+		} catch (error) {
+			// Không cần chặn UI nếu browser tự xử lý thoát fullscreen.
+		}
+	}
+}
+
+function syncFullscreenStageState() {
+	if (document.fullscreenElement) return;
+	state.fullscreenStage = false;
+	document.body.classList.remove("fullscreen-stage");
+	updateFullscreenButton();
+}
+
+function updateFullscreenButton() {
+	if (!elements.fullscreenToggle) return;
+	elements.fullscreenToggle.classList.toggle("active", state.fullscreenStage);
+	elements.fullscreenToggle.title = state.fullscreenStage ? "Thoát Fullscreen Stage" : "Fullscreen Stage";
+	elements.fullscreenToggle.innerHTML = state.fullscreenStage
+		? '<i class="fa fa-compress"></i> Exit Fullscreen'
+		: '<i class="fa fa-expand"></i> Fullscreen';
 }
 
 function updateTransposeDisplay() {
@@ -782,6 +963,15 @@ function createElement(tag, className = "", text = "") {
 	if (className) element.className = className;
 	if (text) element.textContent = text;
 	return element;
+}
+
+function readStoredNumber(key, fallback, min, max) {
+	const value = Number(localStorage.getItem(key));
+	return clamp(Number.isFinite(value) ? value : fallback, min, max);
+}
+
+function clamp(value, min, max) {
+	return Math.max(min, Math.min(max, value));
 }
 
 function mod(value, divisor) {

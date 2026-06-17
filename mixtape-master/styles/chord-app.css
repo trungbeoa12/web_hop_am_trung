@@ -83,7 +83,7 @@ button { cursor: pointer; }
 	font-weight: 700;
 }
 
-.header-actions, .transpose-controls, .modal-actions {
+.header-actions, .transpose-controls, .modal-actions, .stage-tools, .font-controls {
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -128,6 +128,12 @@ button { cursor: pointer; }
 .primary-button:hover, .tool-button:hover, .icon-button:hover, .secondary-button:hover {
 	transform: translateY(-1px);
 	border-color: var(--accent);
+}
+
+.tool-button:disabled, .icon-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+	transform: none;
 }
 
 .sidebar {
@@ -379,6 +385,7 @@ h1, h2, p { margin: 0; }
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
 	gap: 18px;
 	padding: 14px 18px;
 	border-bottom: 1px solid var(--line);
@@ -390,12 +397,66 @@ h1, h2, p { margin: 0; }
 .key-display { display: flex; align-items: baseline; gap: 9px; color: var(--muted); }
 .key-display strong { color: var(--chord); font-size: 22px; }
 .transpose-controls span { min-width: 76px; color: var(--muted); font-size: 12px; text-align: center; }
+.stage-tools {
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	margin-left: auto;
+}
+
+.font-controls {
+	padding: 4px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.font-controls span {
+	min-width: 44px;
+	color: var(--muted);
+	font-size: 12px;
+	text-align: center;
+}
+
+.tool-button.compact {
+	min-width: 58px;
+	padding: 9px 10px;
+}
+
+.tool-button.active, .icon-button.active {
+	border-color: var(--accent);
+	background: var(--accent);
+	color: #fff;
+}
+
+.speed-control {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 42px;
+	padding: 8px 11px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel-soft);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.speed-control input {
+	width: 96px;
+	accent-color: var(--accent);
+}
+
+.speed-control strong {
+	min-width: 16px;
+	color: var(--text);
+	text-align: center;
+}
 
 .chord-sheet {
 	min-height: 360px;
 	padding: clamp(24px, 5vw, 58px);
 	font-family: "Futura", Arial, sans-serif;
-	font-size: clamp(17px, 1.65vw, 21px);
+	font-size: 18px;
 	line-height: 1.4;
 }
 
@@ -473,6 +534,54 @@ h1, h2, p { margin: 0; }
 .sidebar-backdrop { display: none; }
 .mobile-only { display: none; }
 
+body.fullscreen-stage {
+	background: #050506;
+}
+
+body.fullscreen-stage .app-shell {
+	display: block;
+	min-height: 100vh;
+}
+
+body.fullscreen-stage .app-header,
+body.fullscreen-stage .sidebar,
+body.fullscreen-stage .sidebar-backdrop,
+body.fullscreen-stage .song-hero,
+body.fullscreen-stage .admin-actions {
+	display: none !important;
+}
+
+body.fullscreen-stage .main-content {
+	min-height: 100vh;
+	padding: 0;
+	background: #050506;
+}
+
+body.fullscreen-stage .viewer-card {
+	min-height: 100vh;
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+	background: #050506;
+}
+
+body.fullscreen-stage .viewer-toolbar {
+	top: 0;
+	justify-content: center;
+	border-radius: 0;
+	background: rgba(5, 5, 6, 0.94);
+}
+
+body.fullscreen-stage .stage-tools {
+	margin-left: 0;
+}
+
+body.fullscreen-stage .chord-sheet {
+	width: min(980px, 100%);
+	margin: 0 auto;
+	padding: clamp(34px, 6vw, 72px);
+}
+
 @media (max-width: 900px) {
 	:root { --header-height: 66px; }
 	.app-shell { display: block; padding-top: var(--header-height); }
@@ -500,6 +609,11 @@ h1, h2, p { margin: 0; }
 	.main-content { padding: 15px 12px 35px; }
 	.song-hero { min-height: 185px; }
 	.viewer-toolbar { top: calc(var(--header-height) + 7px); }
+	.stage-tools {
+		justify-content: flex-start;
+		width: 100%;
+		margin-left: 0;
+	}
 }
 
 @media (max-width: 600px) {
@@ -510,7 +624,20 @@ h1, h2, p { margin: 0; }
 	.transpose-controls { width: 100%; }
 	.transpose-controls .tool-button { flex: 1; }
 	.transpose-controls span { min-width: 68px; }
-	.chord-sheet { padding: 25px 16px; font-size: 17px; }
+	.stage-tools { gap: 8px; }
+	.stage-tools .tool-button,
+	.stage-tools .speed-control {
+		flex: 1 1 145px;
+	}
+	.font-controls {
+		flex: 1 1 100%;
+		justify-content: space-between;
+	}
+	.speed-control input {
+		min-width: 0;
+		width: 100%;
+	}
+	.chord-sheet { padding: 25px 16px; }
 	.form-grid { grid-template-columns: 1fr; gap: 0; }
 	.modal-dialog { padding: 18px; }
 }
