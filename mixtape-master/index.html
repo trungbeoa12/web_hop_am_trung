@@ -39,9 +39,10 @@
             <a class="btn btn-sub" href="#gallery">Xem vài khoảnh khắc</a>
           </div>
         </div>
-        <figure class="hero-card">
-          <img src="images_landingpage/fullband2.jpg" alt="Trung Beo Chords full band tren san khau">
-          <figcaption class="hero-note">Live Session · Full Band Mood</figcaption>
+        <figure class="hero-card" id="heroCarousel" aria-label="Anh noi bat hero">
+          <div class="hero-track" id="heroTrack"></div>
+          <figcaption class="hero-note" id="heroNote"></figcaption>
+          <div class="hero-dots" id="heroDots" aria-label="Chon anh"></div>
         </figure>
       </div>
     </section>
@@ -103,5 +104,121 @@
   <footer class="footer">
     <div class="site-wrap">Trung Beo Chords · Landing page update</div>
   </footer>
+
+  <script>
+    (() => {
+      const heroImages = [
+        {
+          src: "images_landingpage/fullband2.jpg",
+          alt: "Trung Beo Chords full band tren san khau",
+          caption: "Live Session · Full Band Mood"
+        },
+        {
+          src: "images_landingpage/live1.jpg",
+          alt: "Khoanh khac dien live 1",
+          caption: "Dem Dien · Cung Anh Em"
+        },
+        {
+          src: "images_landingpage/the_alphaband.jpg",
+          alt: "The Alphaband tren san khau",
+          caption: "The Alphaband · Nang Luong San Khau"
+        },
+        {
+          src: "images_landingpage/trungbeo.jpg",
+          alt: "Trung Beo chan dung",
+          caption: "Trung Beo · Soundcheck Mood"
+        }
+      ];
+
+      const carousel = document.getElementById("heroCarousel");
+      const track = document.getElementById("heroTrack");
+      const note = document.getElementById("heroNote");
+      const dotsWrap = document.getElementById("heroDots");
+
+      if (!carousel || !track || !note || !dotsWrap || !heroImages.length) {
+        return;
+      }
+
+      let current = 0;
+      let timer = null;
+      const intervalMs = 4000;
+
+      heroImages.forEach((item, index) => {
+        const slide = document.createElement("img");
+        slide.className = "hero-slide";
+        slide.src = item.src;
+        slide.alt = item.alt;
+        slide.loading = index === 0 ? "eager" : "lazy";
+        if (index === 0) {
+          slide.classList.add("is-active");
+        }
+        track.appendChild(slide);
+
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "hero-dot";
+        dot.setAttribute("aria-label", "Chuyen den anh " + (index + 1));
+        dot.dataset.index = String(index);
+        if (index === 0) {
+          dot.classList.add("is-active");
+        }
+        dot.addEventListener("click", () => {
+          goTo(index);
+          restartAuto();
+        });
+        dotsWrap.appendChild(dot);
+      });
+
+      const slides = track.querySelectorAll(".hero-slide");
+      const dots = dotsWrap.querySelectorAll(".hero-dot");
+
+      const render = () => {
+        slides.forEach((slide, i) => {
+          slide.classList.toggle("is-active", i === current);
+        });
+
+        dots.forEach((dot, i) => {
+          dot.classList.toggle("is-active", i === current);
+          dot.setAttribute("aria-current", i === current ? "true" : "false");
+        });
+
+        note.textContent = heroImages[current].caption;
+      };
+
+      const goTo = (nextIndex) => {
+        current = (nextIndex + heroImages.length) % heroImages.length;
+        render();
+      };
+
+      const next = () => {
+        goTo(current + 1);
+      };
+
+      const startAuto = () => {
+        if (timer) {
+          return;
+        }
+        timer = window.setInterval(next, intervalMs);
+      };
+
+      const stopAuto = () => {
+        if (timer) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+      };
+
+      const restartAuto = () => {
+        stopAuto();
+        startAuto();
+      };
+
+      carousel.addEventListener("mouseenter", stopAuto);
+      carousel.addEventListener("mouseleave", startAuto);
+
+      render();
+      startAuto();
+    })();
+  </script>
 </body>
 </html>
